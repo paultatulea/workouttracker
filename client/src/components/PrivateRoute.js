@@ -14,7 +14,12 @@ export default function PrivateRoute({ component: Component, ...rest }) {
         ) : !isInitialised ? (
           ""
         ) : (
-          <Redirect to="/login" />
+          <Redirect
+            to={{
+              pathname: "/login",
+              state: { referrer: props.location },
+            }}
+          />
         )
       }
     />
