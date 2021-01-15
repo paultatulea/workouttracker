@@ -11,6 +11,7 @@ from workouttracker.preferences import verify_settings_integrity, default_settin
 
 import datetime
 import json
+from functools import wraps
 
 
 # User related endpoints
@@ -103,6 +104,25 @@ def build_user_data(user_id):
         }
 
 
+def auth_token_required(f):
+    @wraps(f)
+    def decorator(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if auth_header is None:
+            return {'message': 'A token is required'}
+        # Authorization header should be in the form 'Bearer {token}'
+        token = auth_header.split()[-1]
+        try:
+            user_id = decode_auth_token(token)
+        except Exception:
+            return {'message': 'Token is invalid'}
+        with session_scope() as session:
+            current_user = session.query(User).filter_by(id=user_id).first()
+            session.expunge(current_user)
+        return f(current_user, *args, **kwargs)
+    return decorator
+
+
 def encode_auth_token(user_id):
     payload = {
         'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1),
@@ -126,11 +146,15 @@ def decode_auth_token(token):
 
 @app.route('/api/v1/validateAuthToken', methods=['POST'])
 def validate_auth_token():
-    token = request.headers.get('x-auth-token')
+    auth_header = request.headers.get('Authorization')
+    if auth_header is None:
+        return {'result': 'failure', 'message': 'Token required'}, 400
+    # Authorization header in the form 'Bearer {token}'
+    token = auth_header.split()[-1]
     try:
         user_id = decode_auth_token(token)
     except Exception:
-        return {'result': 'failure', 'error': 'Could not validate token'}, 400
+        return {'result': 'failure', 'message': 'Could not validate token'}, 400
     user_data = build_user_data(user_id)
     return {'result': 'success', 'userData': user_data}
 
@@ -167,19 +191,19 @@ def update_user_settings():
 # --------------------------------------------------
 
 @app.route('/api/v1/programs', methods=['GET'])
-def fetch_programs():
-    user_id = request.args.get('user_id', type=int)
+@auth_token_required
+def fetch_programs(current_user):
     with session_scope() as session:
-        if user_id is None:
-            result = session.query(Program).all()
-        else:
-            result = session.query(Program).filter_by(user_id=user_id).all()
+        result = (session.query(Program)
+            .filter_by(user_id=current_user.id)
+            .order_by(Program.created_at.desc())
+            .all()
+            )
         programs = [{
             'id': program.id,
             'name': program.name,
-            'user_id': program.user_id,
-            'created_at': program.created_at,
-            'updated_at': program.updated_at,
+            'createdAt': program.created_at,
+            'updatedAt': program.updated_at,
         } for program in result]
     return {'resultSet': programs}
 
@@ -195,16 +219,19 @@ def create_program():
 
 
 @app.route('/api/v1/programs/<program_id>', methods=['GET'])
-def fetch_program_by_id(program_id):
+@auth_token_required
+def fetch_program_by_id(current_user, program_id):
     with session_scope() as session:
-        result = session.query(Program).filter_by(id=program_id).one()
+        result = session.query(Program).filter_by(id=program_id).first()
         program = {
             'id': result.id,
             'name': result.name,
-            'user_id': result.user_id,
-            'created_at': result.created_at,
-            'updated_at': result.updated_at,
+            'userId': result.user_id,
+            'createdAt': result.created_at,
+            'updatedAt': result.updated_at,
+            'workouts': result.workouts
         }
+        # print(program['workouts'])
     return {'resultSet': [program]}
 
 
@@ -224,6 +251,49 @@ def delete_program_by_id(program_id):
         program = session.query(Program).filter_by(id=program_id).one()
         session.delete(program)
     return {'message': 'Program successfully deleted'}
+
+
+@app.route('/api/v1/programs/buildprogram', methods=['POST'])
+@auth_token_required
+def save_program(current_user):
+    program_data = request.json['programData']
+    weight_type_map = {
+        'Weight': 1,
+        'Percentage': 2
+    }
+    print(program_data)
+    with session_scope() as session:
+        program = Program(name=program_data['name'], user_id=current_user.id)
+        session.add(program)
+        session.flush()
+
+        for workout_data in program_data['workouts']:
+            workout = Workout(name=workout_data['name'], program_id=program.id)
+            session.add(workout)
+            session.flush()
+
+            for exercise_data in workout_data['exercises']:
+                exercise = Exercise(
+                    name=exercise_data['name'],
+                    rest_lowerbound=exercise_data['restLowerbound'],
+                    rest_upperbound=exercise_data['restUpperbound'],
+                    workout_id=workout.id,
+                    weight_type_id=weight_type_map[exercise_data['weightType']]
+                )
+                session.add(exercise)
+                session.flush()
+
+                for idx, workout_set_data in enumerate(exercise_data['workoutSets'], 1):
+                    workout_set = WorkoutSet(
+                        order_index=idx,
+                        repititions=workout_set_data['repititions'],
+                        weight=workout_set_data['weight'],
+                        is_amrap=workout_set_data['isAmrap'],
+                        exercise_id=exercise.id,
+                        mass_unit_id=1  # TODO dynamically set
+                    )
+                    session.add(workout_set)
+    return {'message': 'Program successfully saved'}, 201
 
 
 # Workout related endpoints

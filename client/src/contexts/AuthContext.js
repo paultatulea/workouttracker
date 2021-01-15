@@ -21,6 +21,7 @@ export function AuthProvider({ children }) {
       const token = localStorage.getItem("auth-token");
       if (token === null) {
         // Exit out if not specified
+        // Ensure state is updated before returning early
         setIsInitialised(true);
         setIsLoading(false);
         return;
@@ -31,10 +32,11 @@ export function AuthProvider({ children }) {
           token: token,
           user: tokenRes.userData,
         });
-        setIsInitialised(true);
         setIsAuthenticated(true);
-        setIsLoading(false);
       }
+      // Update state
+      setIsInitialised(true);
+      setIsLoading(false);
     };
     checkLoggedIn();
   }, []);

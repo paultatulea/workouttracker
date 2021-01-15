@@ -32,7 +32,7 @@ export default function ExerciseCard({
                 value={exercise.weightType}
                 onChange={e => dispatch({ type: 'UPDATE_EXERCISE_FIELD', payload: {workoutIndex, exerciseIndex, field: 'weightType', value: e.target.value}})}
             >
-                <option>Weight-based</option>
+                <option>Weight</option>
                 <option>Percentage</option>
             </select>
             <div>

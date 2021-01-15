@@ -1,4 +1,3 @@
-
 from workouttracker.models import (
     create_database,
     User, Program, Workout, Exercise, WorkoutSet, MassUnit, WeightType,

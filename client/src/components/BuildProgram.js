@@ -2,16 +2,18 @@ import React, {useReducer} from 'react';
 import ExerciseCard from './ExerciseCard';
 import WorkoutCard from './WorkoutCard';
 import WorkoutSetList from './WorkoutSetList';
+import { saveProgram } from "../api/api";
+import { useAuth } from '../contexts/AuthContext';
 
 const INITIAL_WORKOUTSET = {repititions: 8, weight: null, isAmrap: false};
 const INITIAL_EXERCISE = {
     name: "New Exercise", 
-    weightType: "Weight-based", 
+    weightType: "Weight", 
     restLowerbound: null, 
     restUpperbound: 90, workoutSets: [INITIAL_WORKOUTSET, INITIAL_WORKOUTSET, INITIAL_WORKOUTSET]}
 const INITIAL_WORKOUT = {name: "New Workout", exercises: [INITIAL_EXERCISE]}
 const INITIAL_PROGRAM = {name: "New Program", workouts: [INITIAL_WORKOUT]}
-const INITIAL_STATE = {program: INITIAL_PROGRAM};
+const INITIAL_STATE = {program: INITIAL_PROGRAM, statusMessage: ''};
 
 function buildProgramReducer(state, action) {
     switch (action.type) {
@@ -243,6 +245,12 @@ function buildProgramReducer(state, action) {
                 }
             };
         }
+        case 'SAVE_PROGRAM': {
+            return {
+                ...state,
+                statusMessage: 'Program successfully saved'
+            }
+        }
         default:
             break;
     }
@@ -250,6 +258,12 @@ function buildProgramReducer(state, action) {
 
 export default function BuildProgram() {
     const [state, dispatch] = useReducer(buildProgramReducer, INITIAL_STATE);
+    const { currentUser } = useAuth();
+    
+    async function handleSaveProgram() {
+        console.log(state.program);
+        saveProgram(currentUser.token, state.program);
+    }
 
     return (
         <>
@@ -293,7 +307,7 @@ export default function BuildProgram() {
             </button>
             <button 
                 className="btn btn-primary" 
-                onClick={() => console.log(state.program)}
+                onClick={handleSaveProgram}
             >
                 Save Program
             </button>

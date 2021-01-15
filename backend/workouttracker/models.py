@@ -30,7 +30,7 @@ class User(Base):
     user_settings = relationship('UserSetting', back_populates='user', cascade='all, delete, delete-orphan')
 
     def __repr__(self):
-        return f'<User(id={self.id}, username={self.username}, email={self.email})>'
+        return f'<User(id={self.id}, email={self.email})>'
 
 
 class UserSetting(Base):

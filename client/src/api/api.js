@@ -41,7 +41,7 @@ export async function validateAuthToken(token) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'x-auth-token': token
+            'Authorization': `Bearer ${token}`
         }
     })
     if (!res.ok) {
@@ -49,4 +49,62 @@ export async function validateAuthToken(token) {
         console.log('Could not validate token');
     }
     return res.json();
+}
+
+export async function getUserPrograms(token) {
+    try {
+        const res = await fetch(`${API_URL}/programs`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        })
+        if (!res.ok) {
+            console.log('Could not get user programs');
+        }
+        return res.json();
+    } catch (err) {
+        console.log(err.json())
+    }
+}
+
+
+export async function getProgramById(token, programId) {
+    try {
+        const res = await fetch(`${API_URL}/programs/${programId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        })
+        if (!res.ok) {
+            console.log('Could not get program data')
+        }
+        return res.json();
+    } catch (err) {
+        console.log(err.json())
+    }
+}
+
+export async function saveProgram(token, programData) {
+    try {
+        const res = await fetch(`${API_URL}/programs/buildprogram`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                programData
+            })
+        })
+        if (!res.ok) {
+            console.log('Could not save program');
+        }
+        return res.json();
+    } catch(err) {
+        console.log(err.json())
+    }
 }
