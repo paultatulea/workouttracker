@@ -1,7 +1,18 @@
 from flask import Flask
 from flask_cors import CORS
+import decimal
+import flask.json
+
+class MyJSONEncoder(flask.json.JSONEncoder):
+
+    def default(self, obj):
+        if isinstance(obj, decimal.Decimal):
+            # Convert decimal instances to strings.
+            return str(obj)
+        return super(MyJSONEncoder, self).default(obj)
 
 app = Flask(__name__)
+app.json_encoder = MyJSONEncoder
 CORS(app)
 # Database
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///workout.db'

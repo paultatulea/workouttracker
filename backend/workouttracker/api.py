@@ -4,7 +4,8 @@ import jwt
 from workouttracker import app
 from workouttracker.models import (
     User, Program, Workout, Exercise, WorkoutSet,
-    UserSetting, WorkoutSession, SetLog
+    UserSetting, WorkoutSession, SetLog, MassUnit,
+    WeightType
 )
 from workouttracker.database import session_scope
 from workouttracker.preferences import verify_settings_integrity, default_settings_json_string
@@ -21,11 +22,11 @@ def fetch_users():
     with session_scope() as session:
         result = session.query(User).all()
         users = [{
-            'id': user.id, 
+            'id': user.id,
             'email': user.email,
             'created_at': user.created_at,
             'updated_at': user.updated_at,
-            } 
+        }
             for user in result]
     return {'resultSet': users}
 
@@ -43,7 +44,8 @@ def create_user():
 
 
 def insert_default_settings(user_id, session):
-    user_setting = UserSetting(user_id=user_id, settings=default_settings_json_string)
+    user_setting = UserSetting(
+        user_id=user_id, settings=default_settings_json_string)
     session.add(user_setting)
 
 
@@ -76,6 +78,7 @@ def delete_user_by_id(user_id):
 # Authentication
 # --------------------------------------------------
 
+
 @app.route('/api/v1/login', methods=['POST'])
 def authenticate_user():
     email = request.json['email']
@@ -96,7 +99,8 @@ def authenticate_user():
 def build_user_data(user_id):
     with session_scope() as session:
         user = session.query(User).filter_by(id=user_id).first()
-        user_settings = session.query(UserSetting).filter_by(user_id=user_id).first()
+        user_settings = session.query(
+            UserSetting).filter_by(user_id=user_id).first()
         return {
             'id': user.id,
             'email': user.email,
@@ -134,12 +138,13 @@ def encode_auth_token(user_id):
 
 
 def decode_auth_token(token):
-    payload = jwt.decode(token, app.config['AUTH_SECRET_KEY'], algorithms=['HS256'])
+    payload = jwt.decode(
+        token, app.config['AUTH_SECRET_KEY'], algorithms=['HS256'])
     # Handle decoding errors
     # except jwt.ExpiredSignatureError:
-        # pass
+    # pass
     # except jwt.InvalidTokenError:
-        # pass
+    # pass
     # Return subject of payload if no decoding errors
     return payload['sub']
 
@@ -160,13 +165,16 @@ def validate_auth_token():
 
 # User settings related endpoints
 # --------------------------------------------------
+
+
 @app.route('/api/v1/usersettings', methods=['GET'])
 def fetch_user_settings_by_user_id():
     user_id = request.args.get('user_id', type=int)
     with session_scope() as session:
         result = session.query(UserSetting).filter_by(user_id=user_id).one()
         settings = json.loads(result.settings)
-        user_setting = {'id': result.id, 'user_id': result.user_id, 'settings': settings}
+        user_setting = {'id': result.id,
+                        'user_id': result.user_id, 'settings': settings}
     return {'resultSet': [user_setting]}
 
 
@@ -186,7 +194,6 @@ def update_user_settings():
     return {'message': 'User settings successfully updated'}
 
 
-
 # Program related endpoints
 # --------------------------------------------------
 
@@ -195,27 +202,18 @@ def update_user_settings():
 def fetch_programs(current_user):
     with session_scope() as session:
         result = (session.query(Program)
-            .filter_by(user_id=current_user.id)
-            .order_by(Program.created_at.desc())
-            .all()
-            )
+                  .filter_by(user_id=current_user.id)
+                  .order_by(Program.created_at.desc())
+                  .all()
+                  )
         programs = [{
             'id': program.id,
             'name': program.name,
             'createdAt': program.created_at,
             'updatedAt': program.updated_at,
+            'numWorkouts': len(program.workouts)
         } for program in result]
     return {'resultSet': programs}
-
-
-@app.route('/api/v1/programs', methods=['POST'])
-def create_program():
-    user_id = request.args.get('user_id', type=int)
-    name = request.json['name']
-    program = Program(name=name, user_id=user_id)
-    with session_scope() as session:
-        session.add(program)
-    return {'message': 'Program successfully created'}, 201
 
 
 @app.route('/api/v1/programs/<program_id>', methods=['GET'])
@@ -229,7 +227,12 @@ def fetch_program_by_id(current_user, program_id):
             'userId': result.user_id,
             'createdAt': result.created_at,
             'updatedAt': result.updated_at,
-            'workouts': result.workouts
+            'workouts': [{
+                'id': workout.id,
+                'name': workout.name,
+                'createdAt': workout.created_at,
+                'numExercises': len(workout.exercises)
+            } for workout in result.workouts]
         }
         # print(program['workouts'])
     return {'resultSet': [program]}
@@ -246,14 +249,15 @@ def update_program(program_id):
 
 
 @app.route('/api/v1/programs/<program_id>', methods=['DELETE'])
-def delete_program_by_id(program_id):
+@auth_token_required
+def delete_program_by_id(current_user, program_id):
     with session_scope() as session:
-        program = session.query(Program).filter_by(id=program_id).one()
+        program = session.query(Program).filter_by(id=program_id).first()
         session.delete(program)
     return {'message': 'Program successfully deleted'}
 
 
-@app.route('/api/v1/programs/buildprogram', methods=['POST'])
+@app.route('/api/v1/programs/saveprogram', methods=['POST'])
 @auth_token_required
 def save_program(current_user):
     program_data = request.json['programData']
@@ -261,8 +265,13 @@ def save_program(current_user):
         'Weight': 1,
         'Percentage': 2
     }
-    print(program_data)
+
     with session_scope() as session:
+        # Get the current user mass unit setting
+        user_settings = session.query(UserSetting).filter_by(user_id=current_user.id).first()
+        user_settings = json.loads(user_settings.settings)
+        mass_unit_pref = user_settings['massUnit']
+
         program = Program(name=program_data['name'], user_id=current_user.id)
         session.add(program)
         session.flush()
@@ -290,7 +299,7 @@ def save_program(current_user):
                         weight=workout_set_data['weight'],
                         is_amrap=workout_set_data['isAmrap'],
                         exercise_id=exercise.id,
-                        mass_unit_id=1  # TODO dynamically set
+                        mass_unit_id=None if exercise.weight_type_id == 2 else mass_unit_pref
                     )
                     session.add(workout_set)
     return {'message': 'Program successfully saved'}, 201
@@ -298,26 +307,42 @@ def save_program(current_user):
 
 # Workout related endpoints
 # --------------------------------------------------
-
-@app.route('/api/v1/workouts', methods=['GET'])
-def fetch_workouts():
-    program_id = request.args.get('program_id', type=int)
+@app.route('/api/v1/workouts/<workout_id>', methods=['GET'])
+@auth_token_required
+def fetch_workout_by_id(current_user, workout_id):
     with session_scope() as session:
-        if program_id is None:
-            result = session.query(Workout).all()
-        else:
-            result = session.query(Workout).filter_by(program_id=program_id).all()
-        workouts = [{
-            'id': workout.id,
-            'name': workout.name,
-            'program_id': workout.program_id,
-            'created_at': workout.created_at,
-            'updated_at': workout.updated_at,
-        } for workout in result]
-    return {'resultSet': workouts}
+        weight_types = session.query(WeightType).all()
+        weight_type_map = {wt.id: wt.description for wt in weight_types}
+        mass_units = session.query(MassUnit).all()
+        mass_unit_map = {mu.id: mu.symbol for mu in mass_units}
+        result = session.query(Workout).filter_by(id=workout_id).first()
+        workout = {
+            'id': result.id,
+            'name': result.name,
+            'createdAt': result.created_at,
+            'updatedAt': result.updated_at,
+            'exercises': [{
+                'id': exercise.id,
+                'name': exercise.name,
+                'restLowerbound': exercise.rest_lowerbound,
+                'restUpperbound': exercise.rest_upperbound,
+                'weightType': weight_type_map[exercise.weight_type_id],
+                'createdAt': exercise.created_at,
+                'updatedAt': exercise.updated_at,
+                'workoutSets': [{
+                    'id': ws.id,
+                    'repititions': ws.repititions,
+                    'weight': f'{ws.weight:0.2f}' if ws.weight else None,
+                    'isAmrap': ws.is_amrap,
+                    'massUnit': mass_unit_map[ws.mass_unit_id] if ws.mass_unit_id else None,
+                    'createdAt': ws.created_at
+                } for ws in exercise.workout_sets]
+            } for exercise in result.exercises]
+        }
+    return {'resultSet': [workout]}
 
 
-@app.route('/api/v1/workouts', methods=['POST'])
+@ app.route('/api/v1/workouts', methods=['POST'])
 def create_workout():
     program_id = request.args.get('program_id', type=int)
     name = request.json['name']
@@ -327,21 +352,7 @@ def create_workout():
     return {'message': 'Workout successfully created'}, 201
 
 
-@app.route('/api/v1/workouts/<workout_id>', methods=['GET'])
-def fetch_workout_by_id(workout_id):
-    with session_scope() as session:
-        result = session.query(Workout).filter_by(id=workout_id).one()
-        workout = {
-            'id': result.id,
-            'name': result.name,
-            'program_id': result.program_id,
-            'created_at': result.created_at,
-            'updated_at': result.updated_at,
-        }
-    return {'resultSet': [workout]}
-
-
-@app.route('/api/v1/workouts/<workout_id>', methods=['PUT'])
+@ app.route('/api/v1/workouts/<workout_id>', methods=['PUT'])
 def update_workout(workout_id):
     with session_scope() as session:
         session.query(Workout).filter_by(id=workout_id).update({
@@ -351,24 +362,27 @@ def update_workout(workout_id):
     return {'message': 'Workout successfully updated'}
 
 
-@app.route('/api/v1/workouts/<workout_id>', methods=['DELETE'])
-def delete_workout_by_id(workout_id):
+@ app.route('/api/v1/workouts/<workout_id>', methods=['DELETE'])
+@auth_token_required
+def delete_workout_by_id(current_user, workout_id):
     with session_scope() as session:
-        workout = session.query(Workout).filter_by(id=workout_id).one()
+        workout = session.query(Workout).filter_by(id=workout_id).first()
         session.delete(workout)
     return {'message': 'Workout successfully deleted'}
 
 # Exercise related endpoints
 # --------------------------------------------------
 
-@app.route('/api/v1/exercises', methods=['GET'])
+
+@ app.route('/api/v1/exercises', methods=['GET'])
 def fetch_exercises():
     workout_id = request.args.get('workout_id', type=int)
     with session_scope() as session:
         if workout_id is None:
             result = session.query(Exercise).all()
         else:
-            result = session.query(Exercise).filter_by(workout_id=workout_id).all()
+            result = session.query(Exercise).filter_by(
+                workout_id=workout_id).all()
         exercises = [{
             'id': exercise.id,
             'name': exercise.name,
@@ -382,22 +396,22 @@ def fetch_exercises():
     return {'resultSet': exercises}
 
 
-@app.route('/api/v1/exercises', methods=['POST'])
+@ app.route('/api/v1/exercises', methods=['POST'])
 def create_exercise():
     workout_id = request.args.get('workout_id', type=int)
     name = request.json['name']
     rest_lowerbound = request.json['rest_lowerbound']
     rest_upperbound = request.json['rest_upperbound']
     weight_type_id = request.json['weight_type_id']
-    exercise = Exercise(name=name, rest_lowerbound=rest_lowerbound, 
-        rest_upperbound=rest_upperbound, workout_id=workout_id, 
-        weight_type_id=weight_type_id)
+    exercise = Exercise(name=name, rest_lowerbound=rest_lowerbound,
+                        rest_upperbound=rest_upperbound, workout_id=workout_id,
+                        weight_type_id=weight_type_id)
     with session_scope() as session:
         session.add(exercise)
     return {'message': 'Exercise successfully created'}, 201
 
 
-@app.route('/api/v1/exercises/<exercise_id>', methods=['GET'])
+@ app.route('/api/v1/exercises/<exercise_id>', methods=['GET'])
 def fetch_exercise_by_id(exercise_id):
     with session_scope() as session:
         result = session.query(Exercise).filter_by(id=exercise_id).one()
@@ -414,7 +428,7 @@ def fetch_exercise_by_id(exercise_id):
     return {'resultSet': [exercise]}
 
 
-@app.route('/api/v1/exercise/<exercise_id>', methods=['PUT'])
+@ app.route('/api/v1/exercise/<exercise_id>', methods=['PUT'])
 def update_exercise(exercise_id):
     with session_scope() as session:
         session.query(Exercise).filter_by(id=exercise_id).update({
@@ -427,7 +441,7 @@ def update_exercise(exercise_id):
     return {'message': 'Exercise successfully updated'}
 
 
-@app.route('/api/v1/exercises/<exercise_id>', methods=['DELETE'])
+@ app.route('/api/v1/exercises/<exercise_id>', methods=['DELETE'])
 def delete_exercise_by_id(exercise_id):
     with session_scope() as session:
         exercise = session.query(Exercise).filter_by(id=exercise_id).one()
@@ -438,7 +452,7 @@ def delete_exercise_by_id(exercise_id):
 # WorkoutSet related endpoints
 # --------------------------------------------------
 
-@app.route('/api/v1/workoutsets', methods=['GET'])
+@ app.route('/api/v1/workoutsets', methods=['GET'])
 def fetch_workout_sets():
     exercise_id = request.args.get('exercise_id', type=int)
     with session_scope() as session:
@@ -461,7 +475,7 @@ def fetch_workout_sets():
     return {'resultSet': workout_sets}
 
 
-@app.route('/api/v1/workoutsets/<workoutset_id>', methods=['GET'])
+@ app.route('/api/v1/workoutsets/<workoutset_id>', methods=['GET'])
 def fetch_workout_set_by_id(workoutset_id):
     with session_scope() as session:
         result = session.query(WorkoutSet).filter_by(id=workoutset_id).one()
@@ -478,7 +492,7 @@ def fetch_workout_set_by_id(workoutset_id):
     return {'resultSet': [workout_set]}
 
 
-@app.route('/api/v1/workoutsets', methods=['POST'])
+@ app.route('/api/v1/workoutsets', methods=['POST'])
 def create_workout_sets():
     exercise_id = request.args.get('exercise_id', type=int)
     workout_sets = request.json['workout_sets']
@@ -495,15 +509,16 @@ def create_workout_sets():
     return {'message': 'Workout sets successfully created'}, 201
 
 
-@app.route('/api/v1/workoutsets/<workoutset_id>', methods=['DELETE'])
+@ app.route('/api/v1/workoutsets/<workoutset_id>', methods=['DELETE'])
 def delete_workout_set_by_id(workoutset_id):
     with session_scope() as session:
-        workout_set = session.query(WorkoutSet).filter_by(id=workoutset_id).one()
+        workout_set = session.query(
+            WorkoutSet).filter_by(id=workoutset_id).one()
         session.delete(workout_set)
     return {'message': 'Workout set successfully deleted'}
 
 
-@app.route('/api/v1/workoutsets', methods=['DELETE'])
+@ app.route('/api/v1/workoutsets', methods=['DELETE'])
 def delete_workout_sets():
     exercise_id = request.args.get('exercise_id')
     with session_scope() as session:
@@ -513,15 +528,17 @@ def delete_workout_sets():
 
 # WorkoutSet related endpoints
 # --------------------------------------------------
-@app.route('/api/v1/workoutsessions', methods=['GET'])
+@ app.route('/api/v1/workoutsessions', methods=['GET'])
 def fetch_workout_sessions():
     workout_session_id = request.args.get('workout_session_id', type=int)
     workout_id = request.args.get('workout_id', type=int)
     with session_scope() as session:
         if workout_id is not None:
-            result = session.query(WorkoutSession).filter_by(workout_id=workout_id).all()
+            result = session.query(WorkoutSession).filter_by(
+                workout_id=workout_id).all()
         else:
-            result = session.query(WorkoutSession).filter_by(id=workout_session_id).all()
+            result = session.query(WorkoutSession).filter_by(
+                id=workout_session_id).all()
         workout_sessions = [{
             'id': sesh.id,
             'workout_id': sesh.workout_id,
@@ -531,16 +548,17 @@ def fetch_workout_sessions():
     return {'resultSet': workout_sessions}
 
 
-@app.route('/api/v1/workoutsessions', methods=['POST'])
+@ app.route('/api/v1/workoutsessions', methods=['POST'])
 def create_workout_session():
     workout_id = request.args.get('workout_id', type=int)
-    sesh = WorkoutSession(workout_id=workout_id, start_time=datetime.datetime.utcnow())
+    sesh = WorkoutSession(workout_id=workout_id,
+                          start_time=datetime.datetime.utcnow())
     with session_scope() as session:
         session.add(sesh)
     return {'message': 'Workout sesssion successfully created'}, 201
 
 
-@app.route('/api/v1/workoutsessions', methods=['PUT'])
+@ app.route('/api/v1/workoutsessions', methods=['PUT'])
 def end_workout_session():
     workout_session_id = request.args.get('workout_session_id', type=int)
     with session_scope() as session:
@@ -550,7 +568,7 @@ def end_workout_session():
     return {'message': 'Workout sesssion successfully updated'}, 201
 
 
-@app.route('/api/v1/workoutsessions', methods=['DELETE'])
+@ app.route('/api/v1/workoutsessions', methods=['DELETE'])
 def delete_workout_session():
     workout_session_id = request.args.get('workout_session_id', type=int)
     with session_scope() as session:
@@ -560,7 +578,7 @@ def delete_workout_session():
 
 # SetLog related endpoints
 # --------------------------------------------------
-@app.route('/api/v1/setlogs', methods=['GET'])
+@ app.route('/api/v1/setlogs', methods=['GET'])
 def fetch_set_logs():
     set_log_id = request.args.get('set_log_id', type=int)
     workout_session_id = request.args.get('workout_session_id', type=int)
@@ -569,9 +587,11 @@ def fetch_set_logs():
         if set_log_id is not None:
             result = session.query(SetLog).filter_by(id=set_log_id).all()
         elif workout_set_id is not None:
-            result = session.query(SetLog).filter_by(workout_set_id=workout_set_id).all()
+            result = session.query(SetLog).filter_by(
+                workout_set_id=workout_set_id).all()
         else:
-            result = session.query(SetLog).filter_by(workout_session_id=workout_session_id).all()
+            result = session.query(SetLog).filter_by(
+                workout_session_id=workout_session_id).all()
         set_logs = [{
             'id': log.id,
             'workout_session_id': log.workout_session_id,
@@ -583,7 +603,7 @@ def fetch_set_logs():
     return {'resultSet': set_logs}
 
 
-@app.route('/api/v1/setlogs', methods=['POST'])
+@ app.route('/api/v1/setlogs', methods=['POST'])
 def insert_set_logs():
     workout_session_id = request.args.get('workout_session_id', type=int)
     set_logs = request.json['set_logs']

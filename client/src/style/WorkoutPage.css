@@ -1,0 +1,8 @@
+.workoutPage__header {
+    padding: 10px;
+}
+
+.workoutPage__header__top {
+    display: flex;
+    justify-content: space-between;
+}
