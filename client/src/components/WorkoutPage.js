@@ -43,19 +43,23 @@ export default function WorkoutPage(props) {
     return (
       <>
         <label>Workout name</label>
-        <input type='text' name='name' placeholder='Workout name' value={workoutData.name}/>
+        <input type='text' name='name' placeholder='Workout name' defaultValue={workoutData.name}/>
         {workoutData.exercises.map(exercise => {
           return (
             <div>
               <label>Exercise name</label>
-              <input type='text' name='name' placeholder='Exercise name' value={exercise.name} />
+              <input type='text' name='name' placeholder='Exercise name' defaultValue={exercise.name} />
+              <label>Min Rest</label>
+              <input type='number' name='restLowerbound' defaultValue={exercise.restLowerbound || ''} />
+              <label>Max Rest</label>
+              <input type='number' name='restUpperbound' defaultValue={exercise.restUpperbound} />
               {exercise.workoutSets.map(workoutSet => {
                 return (
                   <div>
                     <label>Reps</label>
-                    <input type='number' value={workoutSet.repititions} />
+                    <input type='number' defaultValue={workoutSet.repititions} />
                     <label>Weight</label>
-                    <input type='number' value={workoutSet.weight || ''} />
+                    <input type='number' defaultValue={workoutSet.weight || ''} />
                   </div>
                 )
               })}
