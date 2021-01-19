@@ -8,6 +8,7 @@ export default function WorkoutPage(props) {
   const [isLoading, setIsLoading] = useState(true);
   const { currentUser } = useAuth();
   const [workoutData, setWorkoutData] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     async function getWorkoutData() {
@@ -17,29 +18,60 @@ export default function WorkoutPage(props) {
       );
       setWorkoutData(res.resultSet[0]);
       setIsLoading(false);
-      console.log(res.resultSet[0])
     }
     getWorkoutData();
   }, []);
+
+  function renderRegularView() {
+    return (
+      <>
+        <div className='workoutPage__header'>
+            <div className='workoutPage__header__top'>
+                <h3>{`Workout: ${workoutData.name}`}</h3>
+                <button className='btn btn-secondary' onClick={() => setIsEditing(true)}>Edit Workout</button>
+            </div>
+            <button className='btn-lg btn-success mx-2'>Start workout session</button>
+        </div>
+        <div className='workoutPage__exerciseList'>
+            {workoutData.exercises.map(exercise => <ExerciseItem key={exercise.id} exercise={exercise} />)}
+        </div>
+      </>
+    )
+  }
+
+  function renderEditingView() {
+    return (
+      <>
+        <label>Workout name</label>
+        <input type='text' name='name' placeholder='Workout name' value={workoutData.name}/>
+        {workoutData.exercises.map(exercise => {
+          return (
+            <div>
+              <label>Exercise name</label>
+              <input type='text' name='name' placeholder='Exercise name' value={exercise.name} />
+              {exercise.workoutSets.map(workoutSet => {
+                return (
+                  <div>
+                    <label>Reps</label>
+                    <input type='number' value={workoutSet.repititions} />
+                    <label>Weight</label>
+                    <input type='number' value={workoutSet.weight || ''} />
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+        <button className='btn-lg btn-success' onClick={() => setIsEditing(false)}>Save Program</button>
+      </>
+    )
+  }
 
   return (
     <div className="workoutPage">
       {isLoading ? (
         <h2>Loading...</h2>
-      ) : (
-        <>
-            <div className='workoutPage__header'>
-                <div className='workoutPage__header__top'>
-                    <h3>{`Workout: ${workoutData.name}`}</h3>
-                    <button className='btn btn-secondary' disabled={true}>Edit Workout</button>
-                </div>
-                <button className='btn-lg btn-success mx-2'>Start workout session</button>
-            </div>
-            <div className='workoutPage__exerciseList'>
-                {workoutData.exercises.map(exercise => <ExerciseItem key={exercise.id} exercise={exercise} />)}
-            </div>
-        </>
-      )}
+      ) : isEditing ? renderEditingView() : renderRegularView()}
     </div>
   );
 }

@@ -6,3 +6,7 @@
     display: flex;
     justify-content: space-between;
 }
+
+.workoutPage__exerciseList {
+    padding: 10px;
+}
