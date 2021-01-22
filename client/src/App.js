@@ -13,6 +13,8 @@ import PrivateRoute from "./components/PrivateRoute";
 import Programs from "./components/Programs";
 import ProgramPage from "./components/ProgramPage";
 import WorkoutPage from "./components/WorkoutPage";
+import EditWorkoutPage from './components/EditWorkoutPage';
+
 
 const App = () => {
   return (
@@ -26,6 +28,7 @@ const App = () => {
             <Route path="/signup" component={Signup} />
             <PrivateRoute path="/programs/:id" component={ProgramPage} />
             <PrivateRoute path="/programs" component={Programs} />
+            <PrivateRoute path='/workouts/:id/edit' component={EditWorkoutPage} />
             <PrivateRoute path="/workouts/:id" component={WorkoutPage} />
             <PrivateRoute path="/buildprogram" component={BuildProgram} />
             <Route component={NotFoundPage} />

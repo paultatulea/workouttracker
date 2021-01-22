@@ -13,6 +13,7 @@ import datetime
 
 Base = declarative_base(database.__engine)
 
+
 def create_database():
     Base.metadata.create_all()
 
@@ -24,10 +25,13 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
     updated_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, nullable=False,
+                        default=datetime.datetime.utcnow)
 
-    programs = relationship('Program', back_populates='user', cascade='all, delete, delete-orphan')
-    user_settings = relationship('UserSetting', back_populates='user', cascade='all, delete, delete-orphan')
+    programs = relationship('Program', back_populates='user',
+                            cascade='all, delete, delete-orphan')
+    user_settings = relationship(
+        'UserSetting', back_populates='user', cascade='all, delete, delete-orphan')
 
     def __repr__(self):
         return f'<User(id={self.id}, email={self.email})>'
@@ -52,11 +56,13 @@ class Program(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     user_id = Column(Integer, ForeignKey('user.id'))
-    updated_at  = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False,
+                        default=datetime.datetime.utcnow)
 
     user = relationship('User', back_populates='programs')
-    workouts = relationship('Workout', back_populates='program', cascade='all, delete, delete-orphan')
+    workouts = relationship(
+        'Workout', back_populates='program', cascade='all, delete, delete-orphan')
 
     def __repr__(self):
         return f'<Program(id={self.id}, name={self.name}, user_id={self.user_id})>'
@@ -69,11 +75,14 @@ class Workout(Base):
     name = Column(String, nullable=False)
     program_id = Column(Integer, ForeignKey('program.id'))
     updated_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, nullable=False,
+                        default=datetime.datetime.utcnow)
 
     program = relationship('Program', back_populates='workouts')
-    exercises = relationship('Exercise', back_populates='workout', cascade='all, delete, delete-orphan')
-    workout_sessions = relationship('WorkoutSession', back_populates='workout', cascade='all, delete, delete-orphan')
+    exercises = relationship(
+        'Exercise', back_populates='workout', cascade='all, delete, delete-orphan')
+    workout_sessions = relationship(
+        'WorkoutSession', back_populates='workout', cascade='all, delete, delete-orphan')
 
     def __repr__(self):
         return f'<Workout(id={self.id}, name={self.name}, program_id={self.program_id})>'
@@ -89,10 +98,12 @@ class Exercise(Base):
     workout_id = Column(Integer, ForeignKey('workout.id'))
     weight_type_id = Column(Integer, ForeignKey('weight_type.id'))
     updated_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, nullable=False,
+                        default=datetime.datetime.utcnow)
 
     workout = relationship('Workout', back_populates='exercises')
-    workout_sets = relationship('WorkoutSet', back_populates='exercise', cascade='all, delete, delete-orphan')
+    workout_sets = relationship(
+        'WorkoutSet', back_populates='exercise', cascade='all, delete, delete-orphan')
     weight_type = relationship('WeightType', back_populates='exercises')
 
     def __repr__(self):
@@ -110,10 +121,12 @@ class WorkoutSet(Base):
     mass_unit_id = Column(Integer, ForeignKey('mass_unit.id'), nullable=True)
     is_amrap = Column(Boolean, nullable=False, default=False)
     exercise_id = Column(Integer, ForeignKey('exercise.id'))
-    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, nullable=False,
+                        default=datetime.datetime.utcnow)
 
     exercise = relationship('Exercise', back_populates='workout_sets')
-    set_logs = relationship('SetLog', back_populates='workout_set', cascade='all, delete, delete-orphan')
+    set_logs = relationship(
+        'SetLog', back_populates='workout_set', cascade='all, delete, delete-orphan')
 
     def __repr__(self):
         return f'<WorkoutSet(id={self.id}, order_index={self.order_index}, repititions={self.repititions}, ' \
@@ -126,11 +139,13 @@ class WorkoutSession(Base):
 
     id = Column(Integer, primary_key=True)
     workout_id = Column(Integer, ForeignKey('workout.id'))
-    start_time = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    start_time = Column(DateTime, nullable=False,
+                        default=datetime.datetime.utcnow)
     end_time = Column(DateTime, nullable=True)
 
     workout = relationship('Workout', back_populates='workout_sessions')
-    set_logs = relationship('SetLog', back_populates='workout_session', cascade='all, delete, delete-orphan')
+    set_logs = relationship(
+        'SetLog', back_populates='workout_session', cascade='all, delete, delete-orphan')
 
     def __repr__(self):
         return f'<WorkoutSession(id={self.id}, workout_id={self.workout_id}, ' \
@@ -162,7 +177,7 @@ class MassUnit(Base):
     id = Column(Integer, primary_key=True)
     description = Column(String, nullable=False)
     symbol = Column(String, nullable=False)
-    ratio_to_kg = Column(Numeric(10,6), nullable=False)
+    ratio_to_kg = Column(Numeric(10, 6), nullable=False)
 
     def __repr__(self):
         return f'<MassUnit(id={self.id}, description={self.description}, ' \
@@ -175,7 +190,24 @@ class WeightType(Base):
     id = Column(Integer, primary_key=True)
     description = Column(String, nullable=False)
 
-    exercises = relationship('Exercise', back_populates='weight_type', cascade='all, delete, delete-orphan')
+    exercises = relationship(
+        'Exercise', back_populates='weight_type', cascade='all, delete, delete-orphan')
 
     def __repr__(self):
         return f'<WeightType(id={self.id}, description={self.description})>'
+
+
+class ExerciseGroup(Base):
+    __tablename__ = 'exercise_group'
+
+    id = Column(Integer, primary_key=True)
+    description = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey('user.id'))
+    effective_start_date = Column(
+        DateTime, nullable=False, default=datetime.datetime.utcnow)
+    effective_end_date = Column(DateTime, nullable=True)
+
+    def __repr__(self):
+        return f'<ExerciseGroup(id={self.id}, description={self.description}, ' \
+            f'user_id={self.user_id}, effective_start_date={self.effective_start_date}, ' \
+            f'effective_end_date={self.effective_end_date}) >'

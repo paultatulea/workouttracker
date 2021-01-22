@@ -1,15 +1,13 @@
 import json
+import yaml
 
+DEFAULT_USER_SETTINGS_PATH = 'defaultUserSettings.yml'
 
+with open(DEFAULT_USER_SETTINGS_PATH, 'r') as f:
+    default_user_settings = yaml.safe_load(f)
 
-# Default values for available settings
-DEFAULT_SETTINGS = {
-    # Controls the mass units used in the application
-    'massUnit': 1,
-}
-
-available_settings = DEFAULT_SETTINGS.keys()
-default_settings_json_string = json.dumps(DEFAULT_SETTINGS)
+available_settings = default_user_settings.keys()
+default_settings_json_string = json.dumps(default_user_settings)
 
 
 def verify_settings_integrity(settings):

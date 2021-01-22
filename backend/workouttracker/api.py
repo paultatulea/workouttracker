@@ -99,12 +99,17 @@ def authenticate_user():
 def build_user_data(user_id):
     with session_scope() as session:
         user = session.query(User).filter_by(id=user_id).first()
-        user_settings = session.query(
+        user_setting = session.query(
             UserSetting).filter_by(user_id=user_id).first()
+        settings = json.loads(user_setting.settings)
+        mass_unit = session.query(MassUnit).filter_by(
+            id=settings['massUnit']).first()
+
         return {
             'id': user.id,
             'email': user.email,
-            'settings': json.loads(user_settings.settings)
+            'massUnitId': mass_unit.id,
+            'massUnitSymbol': mass_unit.symbol,
         }
 
 
@@ -268,7 +273,8 @@ def save_program(current_user):
 
     with session_scope() as session:
         # Get the current user mass unit setting
-        user_settings = session.query(UserSetting).filter_by(user_id=current_user.id).first()
+        user_settings = session.query(UserSetting).filter_by(
+            user_id=current_user.id).first()
         user_settings = json.loads(user_settings.settings)
         mass_unit_pref = user_settings['massUnit']
 
@@ -342,27 +348,37 @@ def fetch_workout_by_id(current_user, workout_id):
     return {'resultSet': [workout]}
 
 
-@ app.route('/api/v1/workouts', methods=['POST'])
-def create_workout():
-    program_id = request.args.get('program_id', type=int)
-    name = request.json['name']
-    workout = Workout(name=name, program_id=program_id)
+@app.route('/api/v1/workouts/<workout_id>', methods=['PUT'])
+@auth_token_required
+def update_workout(current_user, workout_id):
+    workout_data = request.json['workoutData']
     with session_scope() as session:
-        session.add(workout)
-    return {'message': 'Workout successfully created'}, 201
-
-
-@ app.route('/api/v1/workouts/<workout_id>', methods=['PUT'])
-def update_workout(workout_id):
-    with session_scope() as session:
+        # Get mappings for weight type
+        weight_types = session.query(WeightType).all()
+        weight_type_map = {wt.description: wt.id for wt in weight_types}
+        # Update the workout
         session.query(Workout).filter_by(id=workout_id).update({
-            'name': request.json['name'],
+            'name': workout_data['name'],
             'updated_at': datetime.datetime.utcnow()
         })
+        for exercise in workout_data['exercises']:
+            # If id is None, create a new row
+            if exercise['id'] is None:
+                new_exercise = Exercise(
+                    name=exercise['name'],
+                    rest_lowerbound=exercise['restLowerbound'],
+                    rest_upperbound=exercise['restUpperbound'],
+                    workout_id=workout_id,
+                    weight_type_id=weight_type_map['weightType'],
+                )
+                session.add(new_exercise)
+            else:
+                pass
+
     return {'message': 'Workout successfully updated'}
 
 
-@ app.route('/api/v1/workouts/<workout_id>', methods=['DELETE'])
+@app.route('/api/v1/workouts/<workout_id>', methods=['DELETE'])
 @auth_token_required
 def delete_workout_by_id(current_user, workout_id):
     with session_scope() as session:

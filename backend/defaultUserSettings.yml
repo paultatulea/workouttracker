@@ -1,0 +1,6 @@
+# Default user settings 
+
+# Controls the mass units used in the app
+#  - 1 : kg
+#  - 2 : lb
+massUnit: 1

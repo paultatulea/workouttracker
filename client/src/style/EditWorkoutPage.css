@@ -1,0 +1,9 @@
+.editWorkoutPage__bottom {
+  display: flex;
+  flex-direction: column;
+}
+
+.editWorkoutPage__bottom > button {
+  margin: 5px;
+  width: 200px;
+}

@@ -1,0 +1,7 @@
+.editWorkoutSet {
+  display: flex;
+}
+
+.editWorkoutSet > * {
+  margin: 5px;
+}

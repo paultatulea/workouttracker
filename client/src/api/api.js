@@ -89,18 +89,18 @@ export async function getProgramById(token, programId) {
 
 export async function deleteProgram(token, programId) {
   try {
-    const res = await fetch (`${API_URL}/programs/${programId}`, {
-      method: 'DELETE',
+    const res = await fetch(`${API_URL}/programs/${programId}`, {
+      method: "DELETE",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
     });
     if (!res.ok) {
-      console.log('Could not delete program');
+      console.log("Could not delete program");
     }
   } catch (err) {
-    console.log(err.json())
+    console.log(err.json());
   }
 }
 
@@ -154,6 +154,27 @@ export async function deleteWorkout(token, workoutId) {
     });
     if (!res.ok) {
       console.log("Could not delete workout");
+    }
+    return res.json();
+  } catch (err) {
+    console.log(err.json());
+  }
+}
+
+export async function updateWorkout(token, workoutId, workoutData) {
+  try {
+    const res = await fetch(`${API_URL}/workouts/${workoutId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        workoutData,
+      }),
+    });
+    if (!res.ok) {
+      console.log("Could not update workout");
     }
     return res.json();
   } catch (err) {
